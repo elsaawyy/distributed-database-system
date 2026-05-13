@@ -158,6 +158,8 @@ func (a *Aggregator) GetResult(jobID string) interface{} {
 	switch job.JobType {
 	case "sql_aggregation":
 		return a.AggregateSQL(jobID)
+	case "sql_select":
+		return a.AggregateSelect(jobID)
 	case "wordcount":
 		return a.AggregateWordCount(jobID)
 	default:
@@ -174,4 +176,33 @@ func (a *Aggregator) GetAllJobs() []string {
 		jobs = append(jobs, jobID)
 	}
 	return jobs
+}
+
+func (a *Aggregator) AggregateSelect(jobID string) interface{} {
+	a.jobsLock.RLock()
+	job, exists := a.jobs[jobID]
+	a.jobsLock.RUnlock()
+
+	if !exists {
+		return nil
+	}
+
+	job.mu.RLock()
+	defer job.mu.RUnlock()
+
+	// Combine all rows from all workers
+	allRows := make([]interface{}, 0)
+	for _, result := range job.Results {
+		if resMap, ok := result.(map[string]interface{}); ok {
+			if rows, ok := resMap["rows"].([]interface{}); ok {
+				allRows = append(allRows, rows...)
+			}
+		}
+	}
+
+	return map[string]interface{}{
+		"rows":  allRows,
+		"count": len(allRows),
+		"type":  "sql_select",
+	}
 }

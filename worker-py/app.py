@@ -4,6 +4,7 @@ import logging
 import requests
 import threading
 import time
+import mysql.connector
 
 from storage import MySQLStorage
 from executor import LocalExecutor
@@ -30,6 +31,16 @@ worker_id = config['server']['worker_id']
 technology = config['server']['technology']
 reducer_url = config['reducer']['url']
 
+def get_db_connection():
+    """Get a fresh database connection"""
+    return mysql.connector.connect(
+        host=config['mysql']['host'],
+        port=config['mysql']['port'],
+        user=config['mysql']['user'],
+        password=config['mysql']['password'],
+        database='worker2_db'
+    )
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({
@@ -44,16 +55,45 @@ def execute_select():
     data = request.json
     logger.info(f"Worker {worker_id} executing SELECT for job {data.get('job_id')}")
     
+    conn = None
     try:
-        result = executor.execute_select(data['query'])
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
         
-        # Send partial result to reducer
-        partial = {
-            'worker_id': worker_id,
-            'technology': technology,
-            'count': result['count'],
-            'job_id': data.get('job_id')
-        }
+        query = data.get('query')
+        cursor.execute(query)
+        
+        # Check if it's a COUNT query or SELECT *
+        if 'COUNT(' in query.upper():
+            # Handle COUNT query
+            result = cursor.fetchone()
+            count = result.get('COUNT(*)', 0) if result else 0
+            
+            partial = {
+                'worker_id': worker_id,
+                'technology': technology,
+                'count': count,
+                'job_id': data.get('job_id')
+            }
+        else:
+            # Handle SELECT * query - return all rows
+            rows = cursor.fetchall()
+            # Convert datetime objects to string for JSON serialization
+            for row in rows:
+                for key, value in row.items():
+                    if hasattr(value, 'isoformat'):
+                        row[key] = value.isoformat()
+            
+            partial = {
+                'worker_id': worker_id,
+                'technology': technology,
+                'rows': rows,
+                'count': len(rows),
+                'job_id': data.get('job_id')
+            }
+        
+        cursor.close()
+        conn.close()
         
         reducer_endpoint = data.get('reducer_url', reducer_url)
         send_to_reducer(reducer_endpoint, data.get('job_id'), partial)
@@ -61,7 +101,10 @@ def execute_select():
         return jsonify({'status': 'processing', 'job_id': data.get('job_id')})
     except Exception as e:
         logger.error(f"Error executing select: {e}")
+        if conn:
+            conn.close()
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/execute_aggregate', methods=['POST'])
 def execute_aggregate():
@@ -74,7 +117,13 @@ def insert():
     data = request.json
     logger.info(f"Worker {worker_id} inserting {len(data.get('rows', []))} rows")
     
+    # Force use worker2_db
+    actual_db = 'worker2_db'
+    
     try:
+        # Switch to worker2_db
+        storage.execute_update(f"USE {actual_db}")
+        
         rows_inserted = executor.execute_insert(data['table_name'], data['rows'])
         return jsonify({
             'status': 'inserted',
@@ -121,11 +170,27 @@ def map_function():
 @app.route('/create_table', methods=['POST'])
 def create_table():
     data = request.json
-    success = executor.create_table(data['db_name'], data['table_name'], data['schema'])
+    table_name = data.get('table_name')
+    schema = data.get('schema')
+    
+    logger.info(f"Creating table {table_name}")
+    
+    # Force use worker2_db instead of the logical db_name
+    actual_db = 'worker2_db'
+    
+    # Create database if not exists
+    storage.execute_update(f"CREATE DATABASE IF NOT EXISTS {actual_db}")
+    
+    # Use the database
+    storage.execute_update(f"USE {actual_db}")
+    
+    # Create table
+    success = storage.create_table(table_name, schema)
+    
     if success:
-        return jsonify({'status': 'created'})
+        return jsonify({"status": "created"})
     else:
-        return jsonify({'error': 'Failed to create table'}), 500
+        return jsonify({"error": "Failed to create table"}), 500
 
 def send_to_reducer(reducer_url, job_id, partial):
     try:

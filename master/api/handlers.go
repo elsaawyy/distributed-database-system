@@ -14,6 +14,8 @@ import (
 	"distributed-db/master/health"
 	"distributed-db/master/metadata"
 	"distributed-db/master/sharding"
+
+	"github.com/gorilla/mux"
 )
 
 // Request/response structures
@@ -248,10 +250,18 @@ func (h *Handler) Select(w http.ResponseWriter, r *http.Request) {
 
 	jobID := fmt.Sprintf("select-%d", time.Now().UnixNano())
 
+	// Determine query type
+	queryType := "sql_aggregation"
+	if !strings.Contains(strings.ToUpper(req.Query), "COUNT(") &&
+		!strings.Contains(strings.ToUpper(req.Query), "SUM(") &&
+		!strings.Contains(strings.ToUpper(req.Query), "AVG(") {
+		queryType = "sql_select"
+	}
+
 	// Initialize reducer
 	initReq := map[string]interface{}{
 		"job_id": jobID,
-		"type":   "sql_aggregation",
+		"type":   queryType,
 	}
 	initData, _ := json.Marshal(initReq)
 	http.Post(h.coord.GetReducerURL()+"/reduce/init", "application/json", bytes.NewReader(initData))
@@ -260,10 +270,8 @@ func (h *Handler) Select(w http.ResponseWriter, r *http.Request) {
 	workersToQuery := make(map[string]bool)
 
 	for shardID := 0; shardID < table.ShardCount; shardID++ {
-		// Try primary first
 		primaryURL, err := h.metaManager.GetPrimaryWorkerForShard(req.DBName, req.TableName, shardID)
 		if err == nil && primaryURL != "" {
-			// Extract worker ID from URL
 			workerID := extractWorkerID(primaryURL)
 			if h.healthMon.IsWorkerAliveByID(workerID) {
 				workersToQuery[primaryURL] = true
@@ -271,7 +279,6 @@ func (h *Handler) Select(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// If primary dead, try replica
 		replicas, _ := h.metaManager.GetReplicaWorkersForShard(req.DBName, req.TableName, shardID)
 		for _, replicaURL := range replicas {
 			workerID := extractWorkerID(replicaURL)
@@ -504,4 +511,76 @@ func (h *Handler) sendWithRetry(workerURL, endpoint string, data []byte, maxRetr
 		}
 	}
 	return fmt.Errorf("failed after %d retries", maxRetries)
+}
+
+func (h *Handler) ListDatabases(w http.ResponseWriter, r *http.Request) {
+	databases, err := h.metaManager.ListDatabases()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(databases)
+}
+func (h *Handler) ListTables(w http.ResponseWriter, r *http.Request) {
+	dbName := r.URL.Query().Get("db")
+	if dbName == "" {
+		// Try to get from path parameter
+		pathDb := strings.TrimPrefix(r.URL.Path, "/v1/tables/")
+		if pathDb != "" && pathDb != r.URL.Path {
+			dbName = pathDb
+		}
+	}
+	if dbName == "" {
+		http.Error(w, "database name required", http.StatusBadRequest)
+		return
+	}
+
+	tables, err := h.metaManager.ListTables(dbName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tables)
+}
+
+func (h *Handler) GetTableSchema(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	dbName := vars["db"]
+	tableName := vars["table"]
+
+	if dbName == "" || tableName == "" {
+		http.Error(w, "database and table name required", http.StatusBadRequest)
+		return
+	}
+
+	// Get schema from metadata
+	schema, err := h.metaManager.GetTableSchema(dbName, tableName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"schema": schema})
+}
+
+func (h *Handler) DropTable(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DBName    string `json:"db_name"`
+		TableName string `json:"table_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.metaManager.DropTable(req.DBName, req.TableName); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "dropped"})
 }

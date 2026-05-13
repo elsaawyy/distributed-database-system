@@ -80,3 +80,60 @@ func (m *Manager) GetReplicaWorkersForShard(dbName, tableName string, shardID in
 	}
 	return urls, nil
 }
+
+func (m *Manager) ListDatabases() ([]string, error) {
+	rows, err := m.db.Query("SELECT name FROM `databases` ORDER BY name")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var databases []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		databases = append(databases, name)
+	}
+	return databases, nil
+}
+
+func (m *Manager) ListTables(dbName string) ([]string, error) {
+	rows, err := m.db.Query("SELECT table_name FROM tables WHERE db_name = ? ORDER BY table_name", dbName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tables []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		tables = append(tables, name)
+	}
+	return tables, nil
+}
+
+func (m *Manager) GetTableSchema(dbName, tableName string) (string, error) {
+	var schema string
+	err := m.db.QueryRow("SELECT schema_sql FROM tables WHERE db_name = ? AND table_name = ?", dbName, tableName).Scan(&schema)
+	if err != nil {
+		return "", err
+	}
+	return schema, nil
+}
+
+func (m *Manager) DropTable(dbName, tableName string) error {
+	// Delete from metadata
+	_, err := m.db.Exec("DELETE FROM tables WHERE db_name = ? AND table_name = ?", dbName, tableName)
+	if err != nil {
+		return err
+	}
+
+	// Delete shards
+	_, err = m.db.Exec("DELETE FROM shards WHERE db_name = ? AND table_name = ?", dbName, tableName)
+	return err
+}

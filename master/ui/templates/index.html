@@ -1,363 +1,1936 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Distributed Database System - Dashboard</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 30px;
-        }
-        
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-        
-        .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
-        }
-        
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .card {
-            background: white;
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            transition: transform 0.3s;
-        }
-        
-        .card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .card h3 {
-            color: #667eea;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #333;
-        }
-        
-        input, select, textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: opacity 0.3s;
-        }
-        
-        button:hover {
-            opacity: 0.9;
-        }
-        
-        .result {
-            background: #f4f4f4;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            max-height: 300px;
-            overflow: auto;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        
-        .status-alive {
-            background: #4CAF50;
-            color: white;
-        }
-        
-        .status-dead {
-            background: #f44336;
-            color: white;
-        }
-        
-        .worker-list {
-            list-style: none;
-        }
-        
-        .worker-list li {
-            padding: 10px;
-            margin: 5px 0;
-            background: #f9f9f9;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .stats {
-            display: flex;
-            justify-content: space-around;
-            text-align: center;
-            margin-top: 15px;
-        }
-        
-        .stat {
-            flex: 1;
-        }
-        
-        .stat-number {
-            font-size: 2em;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #667eea;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .htmx-indicator {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DistDB — Control Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --bg: #0a0c10;
+  --surface: #10141c;
+  --surface2: #161b26;
+  --surface3: #1e2535;
+  --border: #252d3d;
+  --accent: #00d4ff;
+  --accent2: #7b61ff;
+  --success: #00e5a0;
+  --warn: #ffb700;
+  --danger: #ff4466;
+  --text: #e8edf5;
+  --muted: #6b7a99;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Syne', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  display: flex;
+  overflow-x: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  min-height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.logo {
+  padding: 28px 24px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo-mark {
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+.logo-mark span { color: var(--accent); }
+
+.logo-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.nav { flex: 1; padding: 12px 0; }
+
+.nav-section {
+  padding: 16px 24px 6px;
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--muted);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  border-left: 3px solid transparent;
+  user-select: none;
+}
+
+.nav-item:hover { color: var(--text); background: var(--surface2); }
+
+.nav-item.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: rgba(0,212,255,0.06);
+}
+
+.nav-icon { font-size: 16px; }
+
+.worker-status {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+}
+
+.worker-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface2);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.pulse {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 0 rgba(0,229,160,0.4);
+  animation: pulse 2s infinite;
+  flex-shrink: 0;
+}
+
+.pulse.dead { background: var(--danger); box-shadow: none; animation: none; }
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(0,229,160,0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(0,229,160,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,229,160,0); }
+}
+
+/* Main */
+.main { flex: 1; overflow-y: auto; }
+
+.topbar {
+  height: 60px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.page-title {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.breadcrumb {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.db-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.styled-select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  min-width: 160px;
+}
+
+.styled-select:focus { border-color: var(--accent); }
+
+.content { padding: 28px 32px; }
+
+/* Section pages */
+.page { display: none; }
+.page.active { display: block; }
+
+/* Stats row */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+.stat-card:nth-child(2)::before { background: var(--accent2); }
+.stat-card:nth-child(3)::before { background: var(--success); }
+.stat-card:nth-child(4)::before { background: var(--warn); }
+
+.stat-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+
+.stat-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* Grid layout */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-body { padding: 20px; }
+
+/* Form elements */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.field {
+  margin-bottom: 14px;
+}
+
+.field-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-label .required { color: var(--danger); }
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+}
+
+.field input::placeholder,
+.field textarea::placeholder { color: var(--muted); }
+
+.field textarea { resize: vertical; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  text-decoration: none;
+  user-select: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+}
+
+.btn-primary:hover { background: #00bde8; transform: translateY(-1px); }
+
+.btn-ghost {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-danger {
+  background: rgba(255,68,102,0.12);
+  color: var(--danger);
+  border: 1px solid rgba(255,68,102,0.3);
+}
+
+.btn-danger:hover { background: rgba(255,68,102,0.2); }
+
+.btn-success {
+  background: var(--success);
+  color: #000;
+}
+
+.btn-success:hover { background: #00cc8a; }
+
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 10px 14px;
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.data-table th:hover { color: var(--text); }
+
+.data-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--surface2); }
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.badge-success { background: rgba(0,229,160,0.12); color: var(--success); }
+.badge-danger  { background: rgba(255,68,102,0.12); color: var(--danger); }
+.badge-warn    { background: rgba(255,183,0,0.12); color: var(--warn); }
+.badge-info    { background: rgba(0,212,255,0.12); color: var(--accent); }
+.badge-purple  { background: rgba(123,97,255,0.12); color: var(--accent2); }
+
+/* Schema builder */
+.schema-row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 8px;
+}
+
+.schema-row input, .schema-row select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  outline: none;
+}
+
+.schema-row input:focus, .schema-row select:focus { border-color: var(--accent); }
+
+.remove-col {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+
+.remove-col:hover { border-color: var(--danger); color: var(--danger); }
+
+/* Query builder */
+.condition-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1.5fr auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 8px;
+}
+
+.condition-row input, .condition-row select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  outline: none;
+}
+
+/* Code block */
+.code-block {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  overflow-x: auto;
+  white-space: pre;
+  line-height: 1.5;
+}
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  min-width: 280px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  animation: slideIn 0.25s ease;
+  cursor: pointer;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(110%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+.toast.success { border-left: 3px solid var(--success); }
+.toast.error   { border-left: 3px solid var(--danger); }
+.toast.info    { border-left: 3px solid var(--accent); }
+
+.toast-icon { font-size: 18px; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  width: min(500px, 90vw);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.modal h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.modal p { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.tab {
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Loading spinner */
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* DB cards */
+.db-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+
+.db-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.db-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.db-card.selected { border-color: var(--accent); background: rgba(0,212,255,0.06); }
+
+.db-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-card-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.db-card-actions {
+  position: absolute;
+  top: 10px; right: 10px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.db-card:hover .db-card-actions { opacity: 1; }
+
+/* Empty state */
+.empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+}
+
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty h4 { font-size: 16px; margin-bottom: 6px; color: var(--text); }
+.empty p { font-size: 13px; }
+
+/* Result table wrapper */
+.result-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+/* MapReduce */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--muted);
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(0,212,255,0.04);
+  color: var(--accent);
+}
+
+.drop-zone-icon { font-size: 36px; margin-bottom: 12px; }
+
+/* Progress bar */
+.progress {
+  height: 4px;
+  background: var(--surface3);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 10px 0;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+/* Insert form rows */
+.insert-rows { margin-bottom: 14px; }
+.insert-row {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: end;
+}
+
+.insert-row input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  outline: none;
+  width: 100%;
+}
+
+.insert-row input:focus { border-color: var(--accent); }
+
+/* SQL preview */
+.sql-preview {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin-top: 12px;
+}
+
+.sql-preview .kw { color: var(--accent2); }
+.sql-preview .tbl { color: var(--accent); }
+.sql-preview .val { color: var(--success); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* Worker cards in dashboard */
+.worker-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.worker-info { flex: 1; min-width: 0; }
+.worker-id { font-weight: 700; font-size: 13px; }
+.worker-url { font-family: var(--mono); font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Inline edit */
+.editable-cell {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 6px;
+  transition: background 0.15s;
+}
+.editable-cell:hover { background: var(--surface3); }
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🚀 Distributed Database System</h1>
-            <p>Master-Worker Architecture | Sharding | MapReduce | Fault Tolerance</p>
-        </div>
-        
-        <div class="grid">
-            <!-- System Status Card -->
-            <div class="card">
-                <h3>📊 System Status</h3>
-                <div id="system-stats">
-                    <!-- Loaded via HTMX -->
-                </div>
-            </div>
-            
-            <!-- Workers Card -->
-            <div class="card">
-                <h3>🖥️ Workers</h3>
-                <div id="workers-list" hx-get="/ui/api/workers" hx-trigger="every 5s" hx-swap="innerHTML">
-                    <div class="loading">Loading workers...</div>
-                </div>
-            </div>
-            
-            <!-- Database Operations Card -->
-            <div class="card">
-                <h3>🗄️ Database Operations</h3>
-                <form hx-post="/ui/api/create-db" hx-target="#db-result" hx-indicator="#db-loading">
-                    <div class="form-group">
-                        <label>Database Name</label>
-                        <input type="text" name="name" placeholder="Enter database name" required>
-                    </div>
-                    <button type="submit">Create Database</button>
-                    <img id="db-loading" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23667eea' stroke-width='2'/%3E%3Cpath fill='%23667eea' d='M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E" style="display:none; margin-left:10px;">
-                </form>
-                <div id="db-result" class="result"></div>
-            </div>
-            
-            <!-- Table Operations Card -->
-            <div class="card">
-                <h3>📋 Table Operations</h3>
-                <form hx-post="/ui/api/create-table" hx-target="#table-result" hx-indicator="#table-loading">
-                    <div class="form-group">
-                        <label>Database Name</label>
-                        <input type="text" name="db_name" placeholder="Database name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Table Name</label>
-                        <input type="text" name="table_name" placeholder="Table name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Schema</label>
-                        <textarea name="schema" rows="3" placeholder="id INT PRIMARY KEY, name VARCHAR(100), age INT" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Shard Key</label>
-                        <input type="text" name="shard_key" placeholder="id" required>
-                    </div>
-                    <button type="submit">Create Table</button>
-                    <img id="table-loading" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23667eea' stroke-width='2'/%3E%3Cpath fill='%23667eea' d='M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E" style="display:none; margin-left:10px;">
-                </form>
-                <div id="table-result" class="result"></div>
-            </div>
-            
-            <!-- Data Operations Card -->
-            <div class="card">
-                <h3>💾 Data Operations</h3>
-                <form hx-post="/ui/api/insert" hx-target="#data-result" hx-indicator="#data-loading">
-                    <div class="form-group">
-                        <label>Database Name</label>
-                        <input type="text" name="db_name" placeholder="Database name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Table Name</label>
-                        <input type="text" name="table_name" placeholder="Table name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Data (JSON format)</label>
-                        <textarea name="rows" rows="3" placeholder='[{"id":1,"name":"Alice","age":30}]' required></textarea>
-                    </div>
-                    <button type="submit">Insert Data</button>
-                    <img id="data-loading" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23667eea' stroke-width='2'/%3E%3Cpath fill='%23667eea' d='M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E" style="display:none; margin-left:10px;">
-                </form>
-                <div id="data-result" class="result"></div>
-            </div>
-            
-            <!-- Query Card -->
-            <div class="card">
-                <h3>🔍 Distributed Query</h3>
-                <form hx-post="/ui/api/select" hx-target="#query-result" hx-indicator="#query-loading">
-                    <div class="form-group">
-                        <label>Database Name</label>
-                        <input type="text" name="db_name" placeholder="Database name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Table Name</label>
-                        <input type="text" name="table_name" placeholder="Table name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>SQL Query</label>
-                        <input type="text" name="query" placeholder="SELECT COUNT(*) FROM users" required>
-                    </div>
-                    <button type="submit">Execute Query</button>
-                    <img id="query-loading" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23667eea' stroke-width='2'/%3E%3Cpath fill='%23667eea' d='M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E" style="display:none; margin-left:10px;">
-                </form>
-                <div id="query-result" class="result"></div>
-            </div>
-            
-            <!-- MapReduce Card -->
-            <div class="card">
-                <h3>🗺️ MapReduce - Word Count</h3>
-                <form hx-post="/ui/api/mapreduce" hx-target="#mr-result" hx-indicator="#mr-loading" enctype="multipart/form-data">
-                    <div class="form-group">
-                        <label>Text File</label>
-                        <input type="file" name="file" accept=".txt" required>
-                    </div>
-                    <button type="submit">Run Word Count</button>
-                    <img id="mr-loading" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23667eea' stroke-width='2'/%3E%3Cpath fill='%23667eea' d='M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E" style="display:none; margin-left:10px;">
-                </form>
-                <div id="mr-result" class="result"></div>
-            </div>
-        </div>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">Dist<span>DB</span></div>
+    <div class="logo-sub">Control Center</div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active" onclick="showPage('dashboard', this)">
+      <span class="nav-icon">◈</span> Dashboard
     </div>
-    
-    <script>
-        // Auto-refresh system stats
-        function loadSystemStats() {
-            fetch('/ui/api/stats')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('system-stats').innerHTML = `
-                        <div class="stats">
-                            <div class="stat">
-                                <div class="stat-number">${data.databases}</div>
-                                <div>Databases</div>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-number">${data.tables}</div>
-                                <div>Tables</div>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-number">${data.workers_alive}</div>
-                                <div>Active Workers</div>
-                            </div>
-                        </div>
-                    `;
-                });
+
+    <div class="nav-section">Database</div>
+    <div class="nav-item" onclick="showPage('databases', this)">
+      <span class="nav-icon">◉</span> Databases
+    </div>
+    <div class="nav-item" onclick="showPage('tables', this)">
+      <span class="nav-icon">▦</span> Tables
+    </div>
+
+    <div class="nav-section">Data</div>
+    <div class="nav-item" onclick="showPage('insert', this)">
+      <span class="nav-icon">＋</span> Insert
+    </div>
+    <div class="nav-item" onclick="showPage('query', this)">
+      <span class="nav-icon">⌕</span> Query
+    </div>
+
+    <div class="nav-section">Tools</div>
+    <div class="nav-item" onclick="showPage('mapreduce', this)">
+      <span class="nav-icon">⚙</span> MapReduce
+    </div>
+  </nav>
+
+  <div class="worker-status" id="sidebar-workers">
+    <div class="nav-section" style="padding: 0 0 8px;">Workers</div>
+    <div style="color:var(--muted);font-size:11px;font-family:var(--mono);">Loading...</div>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="page-title" id="page-title">◈ Dashboard</div>
+      <div class="breadcrumb" id="breadcrumb">DistDB / Overview</div>
+    </div>
+    <div class="db-selector">
+      <span style="font-size:12px;color:var(--muted);font-family:var(--mono);">Active DB:</span>
+      <select class="styled-select" id="global-db" onchange="onGlobalDbChange()">
+        <option value="">— select database —</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ───── DASHBOARD ───── -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Active Workers</div>
+          <div class="stat-value" id="stat-workers">—</div>
+          <div class="stat-sub">nodes online</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Databases</div>
+          <div class="stat-value" id="stat-dbs">—</div>
+          <div class="stat-sub">created</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Tables</div>
+          <div class="stat-value" id="stat-tables">—</div>
+          <div class="stat-sub">across all databases</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">System Health</div>
+          <div class="stat-value" id="stat-health" style="color:var(--success);font-size:22px;padding-top:5px;">●  Online</div>
+          <div class="stat-sub" id="stat-health-sub">all systems nominal</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">⚡ Workers</div>
+            <span id="workers-refresh-badge" class="badge badge-info">live</span>
+          </div>
+          <div class="card-body" id="workers-panel">
+            <div class="empty"><div class="empty-icon">⟳</div><p>Loading...</p></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">◉ Databases</div>
+            <button class="btn btn-ghost btn-sm" onclick="showPage('databases', document.querySelectorAll('.nav-item')[1])">Manage →</button>
+          </div>
+          <div class="card-body" id="db-list-dash">
+            <div class="empty"><div class="empty-icon">⟳</div><p>Loading...</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── DATABASES ───── -->
+    <div class="page" id="page-databases">
+      <div class="two-col" style="margin-bottom:20px;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">◉ Create Database</div></div>
+          <div class="card-body">
+            <div class="field">
+              <div class="field-label">Database Name <span class="required">*</span></div>
+              <input type="text" id="new-db-name" placeholder="e.g. analytics_prod">
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-primary" onclick="createDatabase()">Create Database</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">ℹ Quick Guide</div></div>
+          <div class="card-body" style="font-size:13px;color:var(--muted);line-height:1.7;">
+            <p>• Database names must be unique across the cluster.</p>
+            <p>• Use lowercase letters, numbers, and underscores.</p>
+            <p>• After creating, select it in the top bar to manage tables.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">◈ All Databases</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadDatabases()">↺ Refresh</button>
+        </div>
+        <div class="card-body">
+          <div class="db-grid" id="db-grid">
+            <div class="empty"><div class="empty-icon">◉</div><p>No databases yet.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── TABLES ───── -->
+    <div class="page" id="page-tables">
+      <div class="two-col" style="margin-bottom:20px; align-items:start;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">▦ Create Table</div></div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="field">
+                <div class="field-label">Database <span class="required">*</span></div>
+                <select id="table-db-select" class="field select" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-family:var(--mono);font-size:12px;outline:none;" onchange="loadTableList()">
+                  <option value="">Select database</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="field-label">Table Name <span class="required">*</span></div>
+                <input type="text" id="new-table-name" placeholder="e.g. users">
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-label" style="margin-bottom:10px;">Columns</div>
+              <div style="display:grid;grid-template-columns:2fr 1.5fr 1fr 1fr auto;gap:8px;margin-bottom:8px;">
+                <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Name</div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Type</div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">PK</div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Nullable</div>
+                <div></div>
+              </div>
+              <div id="columns-list">
+                <!-- default first row -->
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="addColumn()" style="margin-top:4px;">+ Add Column</button>
+            </div>
+
+            <div class="form-row">
+              <div class="field">
+                <div class="field-label">Shard Key <span class="required">*</span></div>
+                <select id="shard-key-sel" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-family:var(--mono);font-size:12px;outline:none;">
+                  <option value="">Select shard key</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="field-label">Generated SQL</div>
+                <div id="schema-preview" style="font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface2);padding:8px 10px;border-radius:6px;min-height:38px;line-height:1.5;"></div>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="createTable()">Create Table</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">▦ Tables in DB</div>
+            <button class="btn btn-ghost btn-sm" onclick="loadTableList()">↺ Refresh</button>
+          </div>
+          <div class="card-body" id="table-list-panel">
+            <div class="empty"><div class="empty-icon">▦</div><p>Select a database above.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── INSERT ───── -->
+    <div class="page" id="page-insert">
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><div class="card-title">＋ Insert Data</div></div>
+        <div class="card-body">
+          <div class="form-row" style="margin-bottom:16px;">
+            <div class="field">
+              <div class="field-label">Database</div>
+              <select id="insert-db" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-family:var(--mono);font-size:12px;outline:none;" onchange="loadInsertTables()">
+                <option value="">Select database</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="field-label">Table</div>
+              <select id="insert-table" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-family:var(--mono);font-size:12px;outline:none;" onchange="loadInsertSchema()">
+                <option value="">Select table</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="insert-form-area">
+            <div class="empty"><div class="empty-icon">▦</div><p>Select a database and table to begin.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── QUERY ───── -->
+    <div class="page" id="page-query">
+      <div class="two-col" style="margin-bottom:20px;align-items:start;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">⌕ Query Builder</div></div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="field">
+                <div class="field-label">Database</div>
+                <select id="q-db" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-family:var(--mono);font-size:12px;outline:none;" onchange="loadQueryTables()">
+                  <option value="">Select database</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="field-label">Table</div>
+                <select id="q-table" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-family:var(--mono);font-size:12px;outline:none;" onchange="loadQuerySchema()">
+                  <option value="">Select table</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-label">SELECT Columns (leave blank for *)</div>
+              <div id="q-columns" style="display:flex;flex-wrap:wrap;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;min-height:38px;">
+                <span style="font-size:11px;color:var(--muted);font-family:var(--mono);">All columns (*)</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-label">WHERE Conditions</div>
+              <div id="where-rows"></div>
+              <button class="btn btn-ghost btn-sm" onclick="addWhereRow()" style="margin-top:4px;">+ Add Condition</button>
+            </div>
+
+            <div class="form-row">
+              <div class="field">
+                <div class="field-label">ORDER BY</div>
+                <input type="text" id="q-orderby" placeholder="e.g. id DESC">
+              </div>
+              <div class="field">
+                <div class="field-label">LIMIT</div>
+                <input type="number" id="q-limit" placeholder="100" value="100">
+              </div>
+            </div>
+
+            <div id="q-sql-preview" class="sql-preview" style="display:none;"></div>
+
+            <div class="btn-group" style="margin-top:14px;">
+              <button class="btn btn-primary" onclick="runQuery()">Run Query</button>
+              <button class="btn btn-ghost" onclick="toggleSQLPreview()">Show SQL</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">◈ Quick Queries</div>
+          </div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn btn-ghost" style="justify-content:start;" onclick="setQuickQuery('COUNT')">Count all rows</button>
+            <button class="btn btn-ghost" style="justify-content:start;" onclick="setQuickQuery('ALL')">Fetch all (LIMIT 100)</button>
+            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+            <div class="field">
+              <div class="field-label">Raw SQL (advanced)</div>
+              <textarea id="raw-sql" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-family:var(--mono);font-size:12px;outline:none;" rows="4" placeholder="SELECT * FROM users WHERE age > 25 LIMIT 50"></textarea>
+            </div>
+            <button class="btn btn-ghost" onclick="runRawSQL()">Run Raw SQL</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="query-result-card" style="display:none;">
+        <div class="card-header">
+          <div class="card-title">Results</div>
+          <div class="btn-group">
+            <span id="result-count" class="badge badge-info"></span>
+            <button class="btn btn-ghost btn-sm" onclick="exportResults('csv')">Export CSV</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportResults('json')">Export JSON</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div class="result-wrap" id="query-result-table"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── MAPREDUCE ───── -->
+    <div class="page" id="page-mapreduce">
+      <div class="two-col" style="align-items:start;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">⚙ Word Count Job</div></div>
+          <div class="card-body">
+            <div class="drop-zone" id="drop-zone" onclick="document.getElementById('mr-file').click()">
+              <div class="drop-zone-icon">📄</div>
+              <div style="font-weight:600;margin-bottom:6px;">Drop a .txt file here</div>
+              <div style="font-size:12px;">or click to browse</div>
+            </div>
+            <input type="file" id="mr-file" accept=".txt" style="display:none" onchange="onFileSelect(this)">
+
+            <div id="file-preview" style="display:none;margin-top:14px;">
+              <div class="field-label" style="margin-bottom:6px;">File Preview (first 5 lines)</div>
+              <div id="file-preview-content" class="code-block" style="max-height:120px;overflow-y:auto;font-size:11px;"></div>
+            </div>
+
+            <div id="mr-progress" style="display:none;margin-top:14px;">
+              <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:4px;" id="mr-status-text">Running...</div>
+              <div class="progress"><div class="progress-bar" id="mr-bar" style="width:0%"></div></div>
+            </div>
+
+            <div class="btn-group" style="margin-top:14px;">
+              <button class="btn btn-primary" id="mr-run-btn" onclick="runMapReduce()" disabled>Run Word Count</button>
+              <span id="mr-file-name" style="font-size:12px;color:var(--muted);font-family:var(--mono);"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Results</div>
+            <div class="btn-group" id="mr-export-btns" style="display:none;">
+              <button class="btn btn-ghost btn-sm" onclick="exportMR('csv')">CSV</button>
+              <button class="btn btn-ghost btn-sm" onclick="exportMR('json')">JSON</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div id="mr-results">
+              <div class="empty" style="padding:30px;"><div class="empty-icon">⚙</div><p>Upload a file and run to see results.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- Modals -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <h3 id="modal-title">Confirm Action</h3>
+    <p id="modal-msg">Are you sure?</p>
+    <div class="btn-group">
+      <button class="btn btn-danger" id="modal-confirm">Confirm</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ── Config ─────────────────────────────────────────────
+const API = '';
+const HEADERS = { 'Content-Type': 'application/json', 'X-API-Key':'my-secret-key-123' };
+
+// State
+let currentPage = 'dashboard';
+let globalDB = '';
+let queryResults = [];
+let mrResults = [];
+let selectedFile = null;
+let columns = [];
+let querySchema = [];
+let sqlPreviewVisible = false;
+
+// ── Navigation ──────────────────────────────────────────
+function showPage(page, navEl) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  if (navEl) navEl.classList.add('active');
+  currentPage = page;
+  const titles = {
+    dashboard: ['◈ Dashboard', 'DistDB / Overview'],
+    databases: ['◉ Databases', 'DistDB / Databases'],
+    tables:    ['▦ Tables', 'DistDB / Tables'],
+    insert:    ['＋ Insert Data', 'DistDB / Data / Insert'],
+    query:     ['⌕ Query', 'DistDB / Data / Query'],
+    mapreduce: ['⚙ MapReduce', 'DistDB / Tools / MapReduce'],
+  };
+  document.getElementById('page-title').textContent = titles[page][0];
+  document.getElementById('breadcrumb').textContent = titles[page][1];
+}
+
+// ── API helpers ─────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  try {
+    const r = await fetch(API + path, { headers: HEADERS, ...opts });
+    const text = await r.text();
+    try { return JSON.parse(text); }
+    catch { return text; }
+  } catch(e) {
+    toast('Network error: ' + e.message, 'error');
+    throw e;
+  }
+}
+
+// ── Toast ────────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const icons = { info: 'ℹ️', success: '✅', error: '❌', warn: '⚠️' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="toast-icon">${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  el.onclick = () => el.remove();
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ── Modal ────────────────────────────────────────────────
+function openModal(title, msg, onConfirm) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-msg').textContent = msg;
+  document.getElementById('modal-confirm').onclick = () => { onConfirm(); closeModal(); };
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+// ── Dashboard ────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const workers = await apiFetch('/v1/workers');
+    const dbs = await apiFetch('/v1/databases');
+    const alive = Array.isArray(workers) ? workers.filter(w => w.alive).length : 0;
+
+    document.getElementById('stat-workers').textContent = alive;
+    document.getElementById('stat-dbs').textContent = Array.isArray(dbs) ? dbs.length : 0;
+
+    // Workers panel
+    if (Array.isArray(workers) && workers.length) {
+      let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+      workers.forEach(w => {
+        html += `<div class="worker-card">
+          <div class="pulse ${w.alive ? '' : 'dead'}"></div>
+          <div class="worker-info">
+            <div class="worker-id">${w.id}</div>
+            <div class="worker-url">${w.url || ''}</div>
+          </div>
+          <span class="badge ${w.alive ? 'badge-success' : 'badge-danger'}">${w.alive ? 'ALIVE' : 'DEAD'}</span>
+          <span class="badge badge-purple">${w.tech || ''}</span>
+        </div>`;
+      });
+      html += '</div>';
+      document.getElementById('workers-panel').innerHTML = html;
+
+      // Sidebar
+      let sw = '';
+      workers.forEach(w => {
+        sw += `<div class="worker-pill"><div class="pulse ${w.alive ? '' : 'dead'}"></div><span>${w.id}</span></div>`;
+      });
+      document.getElementById('sidebar-workers').innerHTML = '<div class="nav-section" style="padding:0 0 8px;">Workers</div>' + sw;
+    }
+
+    // DB list dash
+    if (Array.isArray(dbs) && dbs.length) {
+      let html = '<div class="db-grid">';
+      dbs.forEach(db => {
+        const name = typeof db === 'string' ? db : db.name || JSON.stringify(db);
+        html += `<div class="db-card" onclick="selectDB('${name}')">
+          <div class="db-card-name">${name}</div>
+          <div class="db-card-meta">database</div>
+        </div>`;
+      });
+      html += '</div>';
+      document.getElementById('db-list-dash').innerHTML = html;
+    } else {
+      document.getElementById('db-list-dash').innerHTML = '<div class="empty"><div class="empty-icon">◉</div><h4>No Databases</h4><p>Go to Databases to create one.</p></div>';
+    }
+
+    // Total tables count (rough)
+    let tableCount = 0;
+    if (Array.isArray(dbs)) {
+      for (const db of dbs) {
+        const name = typeof db === 'string' ? db : db.name;
+        try {
+          const tables = await apiFetch(`/v1/tables/${name}`);
+          if (Array.isArray(tables)) tableCount += tables.length;
+        } catch {}
+      }
+    }
+    document.getElementById('stat-tables').textContent = tableCount;
+
+  } catch(e) {
+    document.getElementById('stat-health').textContent = '● Offline';
+    document.getElementById('stat-health').style.color = 'var(--danger)';
+    document.getElementById('stat-health-sub').textContent = 'connection failed';
+  }
+}
+
+// ── Databases ────────────────────────────────────────────
+async function loadDatabases() {
+  const dbs = await apiFetch('/v1/databases');
+  const grid = document.getElementById('db-grid');
+  const globalSel = document.getElementById('global-db');
+  const tableSel = document.getElementById('table-db-select');
+  const insertSel = document.getElementById('insert-db');
+  const querySel = document.getElementById('q-db');
+
+  const selects = [globalSel, tableSel, insertSel, querySel];
+  selects.forEach(s => { s.innerHTML = '<option value="">— select —</option>'; });
+
+  if (!Array.isArray(dbs) || !dbs.length) {
+    grid.innerHTML = '<div class="empty"><div class="empty-icon">◉</div><h4>No Databases</h4><p>Create one above.</p></div>';
+    return;
+  }
+
+  let html = '';
+  dbs.forEach(db => {
+    const name = typeof db === 'string' ? db : db.name || JSON.stringify(db);
+    html += `<div class="db-card ${globalDB===name?'selected':''}" onclick="selectDB('${name}')">
+      <div class="db-card-name">${name}</div>
+      <div class="db-card-meta">database</div>
+      <div class="db-card-actions">
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmDropDB('${name}')">Drop</button>
+      </div>
+    </div>`;
+    selects.forEach(s => { s.innerHTML += `<option value="${name}">${name}</option>`; });
+  });
+  grid.innerHTML = html;
+  if (globalDB) globalSel.value = globalDB;
+}
+
+async function createDatabase() {
+  const name = document.getElementById('new-db-name').value.trim();
+  if (!name) { toast('Database name is required.', 'error'); return; }
+  const res = await apiFetch('/v1/db/create', { method: 'POST', body: JSON.stringify({ name }) });
+  toast(`Database "${name}" created.`, 'success');
+  document.getElementById('new-db-name').value = '';
+  loadDatabases();
+}
+
+function confirmDropDB(name) {
+  openModal('Drop Database', `Drop database "${name}"? This cannot be undone.`, async () => {
+    await apiFetch('/v1/db/drop', { method: 'POST', body: JSON.stringify({ name }) });
+    toast(`Database "${name}" dropped.`, 'warn');
+    if (globalDB === name) { globalDB = ''; document.getElementById('global-db').value = ''; }
+    loadDatabases();
+  });
+}
+
+function selectDB(name) {
+  globalDB = name;
+  document.getElementById('global-db').value = name;
+  loadDatabases();
+  toast(`Active database: ${name}`, 'info');
+}
+
+function onGlobalDbChange() {
+  globalDB = document.getElementById('global-db').value;
+  if (globalDB) toast(`Active database: ${globalDB}`, 'info');
+}
+
+// ── Tables ───────────────────────────────────────────────
+let colCount = 0;
+
+function addColumn(name='', type='VARCHAR', pk=false, nullable=true) {
+  colCount++;
+  const id = colCount;
+  const div = document.createElement('div');
+  div.className = 'schema-row';
+  div.id = 'col-row-' + id;
+  div.innerHTML = `
+    <input type="text" placeholder="column_name" value="${name}" onchange="syncShardKey();genSchemaSQL()" class="col-name-input">
+    <select onchange="genSchemaSQL()">
+      ${['INT','VARCHAR(255)','TEXT','DECIMAL(10,2)','DATE','BOOLEAN','BIGINT'].map(t=>`<option ${type.startsWith(t.split('(')[0])?'selected':''}>${t}</option>`).join('')}
+    </select>
+    <select onchange="genSchemaSQL()">
+      <option value="1" ${pk?'selected':''}>Yes</option>
+      <option value="0" ${!pk?'selected':''}>No</option>
+    </select>
+    <select onchange="genSchemaSQL()">
+      <option value="1" ${nullable?'selected':''}>Yes</option>
+      <option value="0" ${!nullable?'selected':''}>No</option>
+    </select>
+    <button class="remove-col" onclick="removeColumn(${id})">×</button>`;
+  document.getElementById('columns-list').appendChild(div);
+  syncShardKey();
+  genSchemaSQL();
+}
+
+function removeColumn(id) {
+  document.getElementById('col-row-' + id)?.remove();
+  syncShardKey();
+  genSchemaSQL();
+}
+
+function syncShardKey() {
+  const sel = document.getElementById('shard-key-sel');
+  const names = [...document.querySelectorAll('.col-name-input')].map(i => i.value).filter(Boolean);
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Select shard key</option>' + names.map(n => `<option ${n===prev?'selected':''}>${n}</option>`).join('');
+}
+
+function genSchemaSQL() {
+  const rows = [...document.querySelectorAll('.schema-row')];
+  const parts = rows.map(row => {
+    const inputs = row.querySelectorAll('input,select');
+    const name = inputs[0].value.trim();
+    const type = inputs[1].value;
+    const pk = inputs[2].value === '1';
+    const nullable = inputs[3].value === '1';
+    if (!name) return null;
+    return `${name} ${type}${pk?' PRIMARY KEY':''}${nullable?'':' NOT NULL'}`;
+  }).filter(Boolean);
+  document.getElementById('schema-preview').textContent = parts.join(', ');
+}
+
+async function loadTableList() {
+  const db = document.getElementById('table-db-select').value;
+  if (!db) return;
+  const tables = await apiFetch(`/v1/tables/${db}`);
+  const panel = document.getElementById('table-list-panel');
+  if (!Array.isArray(tables) || !tables.length) {
+    panel.innerHTML = '<div class="empty"><div class="empty-icon">▦</div><p>No tables yet.</p></div>';
+    return;
+  }
+  let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+  tables.forEach(t => {
+    const name = typeof t === 'string' ? t : t.name || JSON.stringify(t);
+    html += `<div class="worker-card" style="cursor:default;">
+      <span style="font-size:18px;">▦</span>
+      <div class="worker-info"><div class="worker-id">${name}</div><div class="worker-url">${db}</div></div>
+      <button class="btn btn-danger btn-sm" onclick="confirmDropTable('${db}','${name}')">Drop</button>
+    </div>`;
+  });
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+async function createTable() {
+  const db = document.getElementById('table-db-select').value;
+  const tableName = document.getElementById('new-table-name').value.trim();
+  const shardKey = document.getElementById('shard-key-sel').value;
+  const schema = document.getElementById('schema-preview').textContent;
+
+  if (!db || !tableName || !schema || !shardKey) {
+    toast('Fill in all required fields.', 'error'); return;
+  }
+
+  const res = await apiFetch('/v1/table/create', {
+    method: 'POST',
+    body: JSON.stringify({ db_name: db, table_name: tableName, schema, shard_key: shardKey })
+  });
+  toast(`Table "${tableName}" created in "${db}".`, 'success');
+  document.getElementById('new-table-name').value = '';
+  loadTableList();
+}
+
+function confirmDropTable(db, table) {
+  openModal('Drop Table', `Drop table "${table}" from "${db}"? This cannot be undone.`, async () => {
+    await apiFetch('/v1/table/drop', { method: 'POST', body: JSON.stringify({ db_name: db, table_name: table }) });
+    toast(`Table "${table}" dropped.`, 'warn');
+    loadTableList();
+  });
+}
+
+// ── Insert ───────────────────────────────────────────────
+let insertSchema = [];
+let insertRows = [{}];
+
+async function loadInsertTables() {
+  const db = document.getElementById('insert-db').value;
+  const sel = document.getElementById('insert-table');
+  sel.innerHTML = '<option value="">Select table</option>';
+  if (!db) return;
+  const tables = await apiFetch(`/v1/tables/${db}`);
+  if (Array.isArray(tables)) {
+    tables.forEach(t => {
+      const name = typeof t === 'string' ? t : t.name;
+      sel.innerHTML += `<option value="${name}">${name}</option>`;
+    });
+  }
+}
+
+async function loadInsertSchema() {
+  const db = document.getElementById('insert-db').value;
+  const table = document.getElementById('insert-table').value;
+  const area = document.getElementById('insert-form-area');
+  if (!db || !table) return;
+
+  const schema = await apiFetch(`/v1/schema/${db}/${table}`);
+  insertSchema = parseSchema(schema);
+  insertRows = [{}];
+  renderInsertForm();
+}
+
+function parseSchema(raw) {
+  // Try to extract column definitions from various response formats
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'object' && raw !== null) {
+    if (raw.schema) return parseSchemaStr(raw.schema);
+    if (raw.columns) return raw.columns;
+  }
+  if (typeof raw === 'string') return parseSchemaStr(raw);
+  return [];
+}
+
+function parseSchemaStr(str) {
+  // Parse "col TYPE, col2 TYPE PRIMARY KEY, ..."
+  return str.split(',').map(part => {
+    part = part.trim();
+    const m = part.match(/^(\w+)\s+(\S+)/);
+    if (!m) return null;
+    return { name: m[1], type: m[2] };
+  }).filter(Boolean);
+}
+
+function renderInsertForm() {
+  const area = document.getElementById('insert-form-area');
+  if (!insertSchema.length) {
+    area.innerHTML = '<div class="empty"><p>Could not load schema.</p></div>';
+    return;
+  }
+
+  let html = `<div style="display:grid;grid-template-columns:repeat(${insertSchema.length},1fr) 40px;gap:8px;margin-bottom:8px;">`;
+  insertSchema.forEach(col => {
+    html += `<div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">${col.name}<br><span style="color:var(--surface3);font-size:9px;">${col.type||''}</span></div>`;
+  });
+  html += '<div></div></div>';
+
+  html += '<div id="insert-rows-container">';
+  insertRows.forEach((row, i) => {
+    html += renderInsertRow(i, row);
+  });
+  html += '</div>';
+
+  html += `<div class="btn-group" style="margin-top:12px;">
+    <button class="btn btn-ghost" onclick="addInsertRow()">+ Add Row</button>
+    <button class="btn btn-primary" onclick="submitInsert()">Insert Data</button>
+  </div>`;
+  area.innerHTML = html;
+}
+
+function renderInsertRow(idx, vals = {}) {
+  const cols = insertSchema.length;
+  let html = `<div id="insert-row-${idx}" style="display:grid;grid-template-columns:repeat(${cols},1fr) 40px;gap:8px;margin-bottom:6px;">`;
+  insertSchema.forEach(col => {
+    html += `<input type="text" placeholder="${col.name}" value="${vals[col.name]||''}" class="insert-field" data-col="${col.name}" data-row="${idx}" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-family:var(--mono);font-size:11px;outline:none;">`;
+  });
+  html += `<button class="remove-col" onclick="removeInsertRow(${idx})" title="Remove row">×</button>`;
+  html += '</div>';
+  return html;
+}
+
+function addInsertRow() {
+  insertRows.push({});
+  const container = document.getElementById('insert-rows-container');
+  if (container) {
+    const idx = insertRows.length - 1;
+    const div = document.createElement('div');
+    div.innerHTML = renderInsertRow(idx, {});
+    container.appendChild(div.firstElementChild);
+  }
+}
+
+function removeInsertRow(idx) {
+  document.getElementById('insert-row-' + idx)?.remove();
+}
+
+async function submitInsert() {
+  const db = document.getElementById('insert-db').value;
+  const table = document.getElementById('insert-table').value;
+  const rowEls = document.querySelectorAll('[id^="insert-row-"]');
+  const rows = [];
+  rowEls.forEach(rowEl => {
+    const fields = rowEl.querySelectorAll('.insert-field');
+    const row = {};
+    fields.forEach(f => { row[f.dataset.col] = f.value; });
+    rows.push(row);
+  });
+
+  if (!rows.length) { toast('No data to insert.', 'error'); return; }
+  const res = await apiFetch('/v1/insert', {
+    method: 'POST',
+    body: JSON.stringify({ db_name: db, table_name: table, rows })
+  });
+  toast(`Inserted ${rows.length} row(s) into "${table}".`, 'success');
+}
+
+// ── Query ────────────────────────────────────────────────
+let selectedCols = [];
+
+async function loadQueryTables() {
+  const db = document.getElementById('q-db').value;
+  const sel = document.getElementById('q-table');
+  sel.innerHTML = '<option value="">Select table</option>';
+  if (!db) return;
+  const tables = await apiFetch(`/v1/tables/${db}`);
+  if (Array.isArray(tables)) {
+    tables.forEach(t => {
+      const name = typeof t === 'string' ? t : t.name;
+      sel.innerHTML += `<option value="${name}">${name}</option>`;
+    });
+  }
+}
+
+async function loadQuerySchema() {
+  const db = document.getElementById('q-db').value;
+  const table = document.getElementById('q-table').value;
+  if (!db || !table) return;
+  const schema = await apiFetch(`/v1/schema/${db}/${table}`);
+  querySchema = parseSchema(schema);
+  selectedCols = [];
+  renderColumnCheckboxes();
+  renderWhereColumnOptions();
+}
+
+function renderColumnCheckboxes() {
+  const div = document.getElementById('q-columns');
+  if (!querySchema.length) {
+    div.innerHTML = '<span style="font-size:11px;color:var(--muted);font-family:var(--mono);">All columns (*)</span>';
+    return;
+  }
+  div.innerHTML = querySchema.map(col =>
+    `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-family:var(--mono);font-size:11px;background:var(--surface3);padding:4px 8px;border-radius:4px;">
+      <input type="checkbox" value="${col.name}" onchange="toggleCol('${col.name}',this.checked)" style="accent-color:var(--accent);">
+      ${col.name}
+    </label>`
+  ).join('');
+}
+
+function toggleCol(name, checked) {
+  if (checked) selectedCols.push(name);
+  else selectedCols = selectedCols.filter(c => c !== name);
+}
+
+function renderWhereColumnOptions() {
+  // Update existing selects in where rows
+  document.querySelectorAll('.where-col-sel').forEach(sel => {
+    const prev = sel.value;
+    sel.innerHTML = querySchema.map(c => `<option ${c.name===prev?'selected':''}>${c.name}</option>`).join('');
+  });
+}
+
+function addWhereRow() {
+  const div = document.createElement('div');
+  div.className = 'condition-row';
+  const colOpts = querySchema.map(c => `<option>${c.name}</option>`).join('') || '<option>column</option>';
+  div.innerHTML = `
+    <select class="where-col-sel">${colOpts}</select>
+    <select>
+      <option>=</option><option>!=</option><option>&gt;</option>
+      <option>&lt;</option><option>&gt;=</option><option>&lt;=</option><option>LIKE</option>
+    </select>
+    <input type="text" placeholder="value">
+    <button class="remove-col" onclick="this.parentElement.remove()">×</button>`;
+  document.getElementById('where-rows').appendChild(div);
+}
+
+function buildSQL() {
+  const db = document.getElementById('q-db').value;
+  const table = document.getElementById('q-table').value;
+  if (!table) return '';
+  const cols = selectedCols.length ? selectedCols.join(', ') : '*';
+  let sql = `SELECT ${cols} FROM ${table}`;
+  const conds = [...document.querySelectorAll('#where-rows .condition-row')].map(row => {
+    const sels = row.querySelectorAll('select');
+    const inp = row.querySelector('input');
+    return `${sels[0].value} ${sels[1].value} '${inp.value}'`;
+  }).filter(r => r.trim() !== "  ''");
+  if (conds.length) sql += ` WHERE ${conds.join(' AND ')}`;
+  const ob = document.getElementById('q-orderby').value.trim();
+  if (ob) sql += ` ORDER BY ${ob}`;
+  const lim = document.getElementById('q-limit').value.trim();
+  if (lim) sql += ` LIMIT ${lim}`;
+  return sql;
+}
+
+function toggleSQLPreview() {
+  sqlPreviewVisible = !sqlPreviewVisible;
+  const el = document.getElementById('q-sql-preview');
+  if (sqlPreviewVisible) {
+    el.style.display = 'block';
+    el.textContent = buildSQL();
+  } else el.style.display = 'none';
+}
+
+async function runQuery() {
+  const db = document.getElementById('q-db').value;
+  const table = document.getElementById('q-table').value;
+  const sql = buildSQL();
+  if (!db || !table) { toast('Select database and table.', 'error'); return; }
+  await executeQuery(db, table, sql);
+}
+
+async function runRawSQL() {
+  const db = document.getElementById('q-db').value;
+  const table = document.getElementById('q-table').value;
+  const sql = document.getElementById('raw-sql').value.trim();
+  if (!db || !table || !sql) { toast('Select database, table, and enter SQL.', 'error'); return; }
+  await executeQuery(db, table, sql);
+}
+
+async function executeQuery(db, table, sql) {
+  const res = await apiFetch('/v1/select', {
+    method: 'POST',
+    body: JSON.stringify({ db_name: db, table_name: table, query: sql })
+  });
+
+  const rows = Array.isArray(res) ? res : (res?.rows || res?.data || []);
+  queryResults = rows;
+
+  const card = document.getElementById('query-result-card');
+  const tableDiv = document.getElementById('query-result-table');
+  card.style.display = 'block';
+  document.getElementById('result-count').textContent = rows.length + ' rows';
+
+  if (!rows.length) {
+    tableDiv.innerHTML = '<div class="empty" style="padding:30px;"><p>No results.</p></div>';
+    return;
+  }
+
+  const keys = Object.keys(rows[0]);
+  let html = `<table class="data-table"><thead><tr>${keys.map(k=>`<th onclick="sortResults('${k}')">${k} ↕</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(row => {
+    html += '<tr>' + keys.map(k => `<td>${row[k] !== null && row[k] !== undefined ? row[k] : '<span style="color:var(--muted)">NULL</span>'}</td>`).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  tableDiv.innerHTML = html;
+}
+
+function sortResults(col) {
+  if (!queryResults.length) return;
+  queryResults.sort((a, b) => {
+    const av = a[col], bv = b[col];
+    return av < bv ? -1 : av > bv ? 1 : 0;
+  });
+  executeQueryFromState();
+}
+
+function executeQueryFromState() {
+  const db = document.getElementById('q-db').value;
+  const table = document.getElementById('q-table').value;
+  // Re-render results
+  const rows = queryResults;
+  if (!rows.length) return;
+  const keys = Object.keys(rows[0]);
+  const tableDiv = document.getElementById('query-result-table');
+  let html = `<table class="data-table"><thead><tr>${keys.map(k=>`<th onclick="sortResults('${k}')">${k} ↕</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(row => {
+    html += '<tr>' + keys.map(k => `<td>${row[k] !== null ? row[k] : '<span style="color:var(--muted)">NULL</span>'}</td>`).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  tableDiv.innerHTML = html;
+}
+
+function setQuickQuery(type) {
+  const db = document.getElementById('q-db').value;
+  const table = document.getElementById('q-table').value;
+  if (!table) { toast('Select a table first.', 'error'); return; }
+  const sqls = {
+    COUNT: `SELECT COUNT(*) FROM ${table}`,
+    ALL: `SELECT * FROM ${table} LIMIT 100`,
+  };
+  document.getElementById('raw-sql').value = sqls[type];
+}
+
+function exportResults(fmt) {
+  if (!queryResults.length) return;
+  let content, mime, ext;
+  if (fmt === 'json') {
+    content = JSON.stringify(queryResults, null, 2);
+    mime = 'application/json'; ext = 'json';
+  } else {
+    const keys = Object.keys(queryResults[0]);
+    content = keys.join(',') + '\n' + queryResults.map(r => keys.map(k => JSON.stringify(r[k]||'')).join(',')).join('\n');
+    mime = 'text/csv'; ext = 'csv';
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+  a.download = `results.${ext}`;
+  a.click();
+}
+
+// ── MapReduce ────────────────────────────────────────────
+function onFileSelect(input) {
+  selectedFile = input.files[0];
+  if (!selectedFile) return;
+  document.getElementById('mr-file-name').textContent = selectedFile.name;
+  document.getElementById('mr-run-btn').disabled = false;
+
+  // Preview
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.split('\n').slice(0, 5).join('\n');
+    document.getElementById('file-preview-content').textContent = lines;
+    document.getElementById('file-preview').style.display = 'block';
+  };
+  reader.readAsText(selectedFile);
+}
+
+// Drag and drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    document.getElementById('mr-file').files;
+    selectedFile = file;
+    document.getElementById('mr-file-name').textContent = file.name;
+    document.getElementById('mr-run-btn').disabled = false;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const lines = ev.target.result.split('\n').slice(0, 5).join('\n');
+      document.getElementById('file-preview-content').textContent = lines;
+      document.getElementById('file-preview').style.display = 'block';
+    };
+    reader.readAsText(file);
+  }
+});
+
+async function runMapReduce() {
+    if (!selectedFile) return;
+    const progress = document.getElementById('mr-progress');
+    const bar = document.getElementById('mr-bar');
+    const statusText = document.getElementById('mr-status-text');
+    progress.style.display = 'block';
+
+    let pct = 0;
+    statusText.textContent = 'Splitting input...';
+    const interval = setInterval(() => {
+        pct = Math.min(pct + Math.random() * 15, 85);
+        bar.style.width = pct + '%';
+        if (pct > 30) statusText.textContent = 'Running mappers...';
+        if (pct > 60) statusText.textContent = 'Reducing...';
+    }, 400);
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+
+    try {
+        const r = await fetch(API + '/v1/mapreduce/wordcount', { 
+            method: 'POST', 
+            headers: { 
+                'X-API-Key': 'my-secret-key-123'  // Make sure this is correct
+            }, 
+            body: fd 
+        });
+        const data = await r.json();
+        clearInterval(interval);
+        bar.style.width = '100%';
+        statusText.textContent = 'Complete!';
+
+        // Check if error
+        if (data.error) {
+            toast('Error: ' + data.error, 'error');
+            mrResults = [];
+        } else {
+            // Parse results
+            mrResults = Object.entries(data).map(([word, count]) => ({ word, count }));
+            mrResults.sort((a, b) => b.count - a.count);
+            renderMRResults();
+            document.getElementById('mr-export-btns').style.display = 'flex';
+            toast('MapReduce complete!', 'success');
         }
-        
-        // Auto-refresh workers
-        function loadWorkers() {
-            fetch('/ui/api/workers')
-                .then(response => response.json())
-                .then(workers => {
-                    let html = '<ul class="worker-list">';
-                    workers.forEach(w => {
-                        html += `
-                            <li>
-                                <span><strong>${w.id}</strong> (${w.tech})</span>
-                                <span class="status-badge status-${w.alive ? 'alive' : 'dead'}">
-                                    ${w.alive ? '🟢 ALIVE' : '🔴 DEAD'}
-                                </span>
-                                <span style="font-size:11px; color:#666;">${w.url}</span>
-                            </li>
-                        `;
-                    });
-                    html += '</ul>';
-                    document.getElementById('workers-list').innerHTML = html;
-                });
-        }
-        
-        loadSystemStats();
-        loadWorkers();
-        setInterval(loadSystemStats, 5000);
-        setInterval(loadWorkers, 5000);
-    </script>
+    } catch(e) {
+        clearInterval(interval);
+        statusText.textContent = 'Error: ' + e.message;
+        toast('MapReduce failed: ' + e.message, 'error');
+    }
+}
+
+function renderMRResults() {
+  const div = document.getElementById('mr-results');
+  if (!mrResults.length) {
+    div.innerHTML = '<div class="empty"><p>No results.</p></div>';
+    return;
+  }
+  const rows = mrResults.slice(0, 100);
+  let html = '<table class="data-table"><thead><tr><th>Word</th><th>Count</th><th>Bar</th></tr></thead><tbody>';
+  const max = rows[0]?.count || rows[0]?.[1] || 1;
+  rows.forEach(r => {
+    const word = r.word || r[0];
+    const count = r.count || r[1];
+    const pct = Math.round((count / max) * 100);
+    html += `<tr>
+      <td style="font-family:var(--mono)">${word}</td>
+      <td><span class="badge badge-info">${count}</span></td>
+      <td style="width:40%;"><div class="progress" style="margin:0;height:6px;"><div class="progress-bar" style="width:${pct}%"></div></div></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  div.innerHTML = html;
+}
+
+function exportMR(fmt) {
+  if (!mrResults.length) return;
+  let content, mime, ext;
+  if (fmt === 'json') {
+    content = JSON.stringify(mrResults, null, 2);
+    mime = 'application/json'; ext = 'json';
+  } else {
+    content = 'word,count\n' + mrResults.map(r => `${r.word||r[0]},${r.count||r[1]}`).join('\n');
+    mime = 'text/csv'; ext = 'csv';
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+  a.download = `wordcount.${ext}`;
+  a.click();
+}
+
+// ── Init ─────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  // Default column rows
+  addColumn('id', 'INT', true, false);
+  addColumn('name', 'VARCHAR(255)', false, true);
+
+  loadDashboard();
+  loadDatabases();
+  setInterval(loadDashboard, 5000);
+});
+</script>
 </body>
 </html>

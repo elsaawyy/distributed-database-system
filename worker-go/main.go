@@ -81,58 +81,96 @@ func executeSelectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Executing select on worker1 for job %s", req.JobID)
-
-	var count int
-	var result interface{}
+	log.Printf("Executing select on worker1 for job %s: %s", req.JobID, req.Query)
 
 	if db != nil {
-		// Switch to correct database
-		_, err := db.Exec(fmt.Sprintf("USE %s", req.DBName))
+		_, err := db.Exec("USE worker1_db")
 		if err != nil {
-			log.Printf("Error switching to database %s: %v", req.DBName, err)
-			result = map[string]interface{}{
-				"worker_id": "worker1",
-				"tech":      "go",
-				"count":     0,
-				"job_id":    req.JobID,
-				"error":     err.Error(),
-			}
-		} else {
-			// Execute the query
+			log.Printf("Database error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	var result interface{}
+
+	// Check if it's a COUNT query (starts with SELECT COUNT)
+	if strings.Contains(strings.ToUpper(req.Query), "SELECT COUNT(") {
+		// Handle COUNT query
+		var count int
+		var err error
+		if db != nil {
 			row := db.QueryRow(req.Query)
 			err = row.Scan(&count)
 			if err != nil {
-				log.Printf("Query error: %v", err)
-				result = map[string]interface{}{
-					"worker_id": "worker1",
-					"tech":      "go",
-					"count":     0,
-					"job_id":    req.JobID,
-					"error":     err.Error(),
-				}
-			} else {
-				result = map[string]interface{}{
-					"worker_id": "worker1",
-					"tech":      "go",
-					"count":     count,
-					"job_id":    req.JobID,
-				}
+				log.Printf("Count query error: %v", err)
+				count = 0
 			}
+		} else {
+			count = 42
 		}
-	} else {
-		// Demo mode - return mock data
 		result = map[string]interface{}{
 			"worker_id": "worker1",
 			"tech":      "go",
-			"count":     42,
+			"count":     count,
+			"job_id":    req.JobID,
+		}
+	} else {
+		// Handle SELECT * query - return all rows
+		rows, err := db.Query(req.Query)
+		if err != nil {
+			log.Printf("Select query error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		columns, err := rows.Columns()
+		if err != nil {
+			log.Printf("Columns error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var results []map[string]interface{}
+
+		for rows.Next() {
+			values := make([]interface{}, len(columns))
+			valuePtrs := make([]interface{}, len(columns))
+			for i := range values {
+				valuePtrs[i] = &values[i]
+			}
+
+			if err := rows.Scan(valuePtrs...); err != nil {
+				log.Printf("Scan error: %v", err)
+				continue
+			}
+
+			row := make(map[string]interface{})
+			for i, col := range columns {
+				// Convert []byte to string for better display
+				if val, ok := values[i].([]byte); ok {
+					row[col] = string(val)
+				} else {
+					row[col] = values[i]
+				}
+			}
+			results = append(results, row)
+		}
+
+		result = map[string]interface{}{
+			"worker_id": "worker1",
+			"tech":      "go",
+			"rows":      results,
+			"count":     len(results),
 			"job_id":    req.JobID,
 		}
 	}
 
-	// Send to reducer if URL provided
+	// Send to reducer
 	if req.ReducerURL != "" {
 		go sendToReducer(req.ReducerURL, req.JobID, result)
+		log.Printf("Sent result to reducer for job %s", req.JobID)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -141,7 +179,6 @@ func executeSelectHandler(w http.ResponseWriter, r *http.Request) {
 		"result": result,
 	})
 }
-
 func executeAggregateHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		DBName    string `json:"db_name"`
@@ -191,22 +228,18 @@ func insertHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Inserting %d rows into %s.%s (shard %d)", len(req.Rows), req.DBName, req.TableName, req.ShardID)
+	// ALWAYS use worker1_db regardless of what DBName is sent
+	actualDB := "worker1_db"
+
+	log.Printf("Inserting %d rows into %s.%s (shard %d)", len(req.Rows), actualDB, req.TableName, req.ShardID)
 
 	if db == nil {
 		http.Error(w, "database not connected", http.StatusInternalServerError)
 		return
 	}
 
-	// Create database if not exists
-	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", req.DBName))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Use the database
-	_, err = db.Exec(fmt.Sprintf("USE %s", req.DBName))
+	// Use worker1_db
+	_, err := db.Exec(fmt.Sprintf("USE %s", actualDB))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -320,26 +353,19 @@ func createTableHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Creating table %s.%s on worker1", req.DBName, req.TableName)
+	// ALWAYS use worker1_db
+	actualDB := "worker1_db"
+
+	log.Printf("Creating table %s.%s on worker1", actualDB, req.TableName)
 
 	if db != nil {
-		// Create database if not exists
-		_, err := db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", req.DBName))
-		if err != nil {
-			log.Printf("Error creating database: %v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Use the database
-		_, err = db.Exec(fmt.Sprintf("USE %s", req.DBName))
+		_, err := db.Exec(fmt.Sprintf("USE %s", actualDB))
 		if err != nil {
 			log.Printf("Error using database: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// Create table
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", req.TableName, req.Schema)
 		_, err = db.Exec(query)
 		if err != nil {
@@ -348,7 +374,7 @@ func createTableHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.Printf("Table %s created successfully in %s", req.TableName, req.DBName)
+		log.Printf("Table %s created successfully in %s", req.TableName, actualDB)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -493,8 +519,5 @@ func sendToReducer(reducerURL, jobID string, result interface{}) {
 	}
 	defer resp.Body.Close()
 
-	// Add this - check response status
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("Reducer returned non-200 status: %d", resp.StatusCode)
-	}
+	log.Printf("Sent partial result to reducer for job %s, response: %d", jobID, resp.StatusCode)
 }
