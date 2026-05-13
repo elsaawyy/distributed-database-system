@@ -1,0 +1,31 @@
+server:
+  port: ":8080"
+
+metadata_db:
+  host: "localhost"
+  port: 3309
+  user: "root"
+  password: ""
+  dbname: "distributed_metadata"
+
+workers:
+  - id: "worker1"
+    url: "http://localhost:8081"
+    tech: "go"
+  - id: "worker2"
+    url: "http://localhost:8082"
+    tech: "python"
+  - id: "worker3"
+    url: "http://localhost:8083"
+    tech: "nodejs"
+
+reducer:
+  url: "http://localhost:8090"
+
+auth:
+  api_key: "my-secret-key-123"
+
+heartbeat_interval: 5
+replication_factor: 2
+shard_count: 64
+chunk_size_kb: 64

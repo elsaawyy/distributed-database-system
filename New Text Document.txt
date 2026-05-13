@@ -1,0 +1,58 @@
+distributed-db/
+├── master/
+│   ├── main.go
+│   ├── api/
+│   │   ├── router.go
+│   │   ├── handlers.go
+│   │   └── auth.go
+│   ├── coordinator/
+│   │   ├── scheduler.go
+│   │   └── task_dispatcher.go
+│   ├── metadata/
+│   │   ├── manager.go
+│   │   └── models.go
+│   ├── sharding/
+│   │   ├── chunk_splitter.go
+│   │   └── consistent_hash.go
+│   ├── replication/
+│   │   └── replica_manager.go
+│   ├── health/
+│   │   └── monitor.go
+│   ├── election/
+│   │   └── leader_election.go
+│   └── config.yaml
+├── worker-go/
+│   ├── main.go
+│   ├── storage/
+│   │   └── mysql_client.go
+│   ├── executor/
+│   │   └── local_executor.go
+│   ├── handler/
+│   │   └── http_handler.go
+│   └── config.yaml
+├── worker-py/
+│   ├── app.py
+│   ├── storage.py
+│   ├── executor.py
+│   ├── requirements.txt
+│   └── config.yaml
+├── worker-nodejs/
+│   ├── server.js
+│   ├── storage.js
+│   ├── executor.js
+│   └── config.json
+├── reducer/
+│   ├── main.go
+│   ├── aggregator/
+│   │   └── reducer.go
+│   ├── merge/
+│   │   └── merger.go
+│   └── config.yaml
+├── client/
+│   ├── client.go
+│   └── demo_workflow.sh
+├── metadata-db/
+│   └── schema.sql
+├── docker-compose.yml
+├── README.md
+└── deployment.md

@@ -1,0 +1,117 @@
+package main
+
+import (
+	"database/sql"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"strconv"
+	"time"
+
+	"worker-go/handler"
+	"worker-go/storage"
+
+	_ "github.com/go-sql-driver/mysql"
+	"gopkg.in/yaml.v3"
+)
+
+type Config struct {
+	Server struct {
+		Port       string `yaml:"port"`
+		WorkerID   string `yaml:"worker_id"`
+		Technology string `yaml:"technology"`
+	} `yaml:"server"`
+	MySQL struct {
+		Host     string `yaml:"host"`
+		Port     int    `yaml:"port"`
+		User     string `yaml:"user"`
+		Password string `yaml:"password"`
+		Database string `yaml:"database"`
+	} `yaml:"mysql"`
+	Master struct {
+		URL    string `yaml:"url"`
+		APIKey string `yaml:"api_key"`
+	} `yaml:"master"`
+	Reducer struct {
+		URL string `yaml:"url"`
+	} `yaml:"reducer"`
+	HeartbeatInterval int `yaml:"heartbeat_interval"`
+}
+
+func main() {
+	// Read config
+	data, err := os.ReadFile("config.yaml")
+	if err != nil {
+		log.Fatal("Cannot read config:", err)
+	}
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		log.Fatal("Cannot parse config:", err)
+	}
+
+	// Connect to MySQL
+	dsn := cfg.MySQL.User + ":" + cfg.MySQL.Password +
+		"@tcp(" + cfg.MySQL.Host + ":" + strconv.Itoa(cfg.MySQL.Port) +
+		")/" + cfg.MySQL.Database + "?parseTime=true&multiStatements=true"
+
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		log.Printf("Warning: Could not connect to MySQL: %v", err)
+		log.Println("Worker running in degraded mode")
+	} else {
+		defer db.Close()
+		db.SetMaxOpenConns(10)
+		db.SetMaxIdleConns(5)
+		if err := db.Ping(); err != nil {
+			log.Printf("Cannot ping MySQL: %v", err)
+		} else {
+			log.Println("Connected to MySQL successfully")
+			// Create database if not exists
+			storage.InitDatabase(db, cfg.MySQL.Database)
+		}
+	}
+
+	// Initialize storage and executor
+	store := storage.NewMySQLStorage(db)
+	exec := executor.NewLocalExecutor(store)
+
+	// Create HTTP handler
+	httpHandler := handler.NewHandler(store, exec, cfg.Server.WorkerID, cfg.Server.Technology, cfg.Reducer.URL)
+
+	// Start heartbeat to master
+	go startHeartbeat(cfg.Master.URL, cfg.Master.APIKey, cfg.Server.WorkerID, cfg.Server.Port, cfg.Server.Technology)
+
+	// Setup HTTP server
+	mux := http.NewServeMux()
+	httpHandler.RegisterRoutes(mux)
+
+	srv := &http.Server{
+		Addr:         cfg.Server.Port,
+		Handler:      mux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+	}
+
+	go func() {
+		log.Printf("Go Worker listening on %s", cfg.Server.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	// Graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+	log.Println("Shutting down worker...")
+	srv.Close()
+}
+
+func startHeartbeat(masterURL, apiKey, workerID, workerPort, technology string) {
+	ticker := time.NewTicker(5 * time.Second)
+	for range ticker.C {
+		// In real implementation, send heartbeat to master
+		log.Printf("Heartbeat sent to master from worker %s", workerID)
+	}
+}

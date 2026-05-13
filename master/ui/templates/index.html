@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Database System - Dashboard</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: opacity 0.3s;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+        }
+        
+        .result {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-alive {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .status-dead {
+            background: #f44336;
+            color: white;
+        }
+        
+        .worker-list {
+            list-style: none;
+        }
+        
+        .worker-list li {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f9f9f9;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            margin-top: 15px;
+        }
+        
+        .stat {
+            flex: 1;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .htmx-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Distributed Database System</h1>
+            <p>Master-Worker Architecture | Sharding | MapReduce | Fault Tolerance</p>
+        </div>
+        
+        <div class="grid">
+            <!-- System Status Card -->
+            <div class="card">
+                <h3>📊 System Status</h3>
+                <div id="system-stats">
+                    <!-- Loaded via HTMX -->
+                </div>
+            </div>
+            
+            <!-- Workers Card -->
+            <div class="card">
+                <h3>🖥️ Workers</h3>
+                <div id="workers-list" hx-get="/ui/api/workers" hx-trigger="every 5s" hx-swap="innerHTML">
+                    <div class="loading">Loading workers...</div>
+                </div>
+            </div>
+            
+            <!-- Database Operations Card -->
+            <div class="card">
+                <h3>🗄️ Database Operations</h3>
+                <form hx-post="/ui/api/create-db" hx-target="#db-result" hx-indicator="#db-loading">
+                    <div class="form-group">
+                        <label>Database Name</label>
+                        <input type="text" name="name" placeholder="Enter database name" required>
+                    </div>
+                    <button type="submit">Create Database</button>
+                    <img id="db-loading" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23667eea' stroke-width='2'/%3E%3Cpath fill='%23667eea' d='M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E" style="display:none; margin-left:10px;">
+                </form>
+                <div id="db-result" class="result"></div>
+            </div>
+            
+            <!-- Table Operations Card -->
+            <div class="card">
+                <h3>📋 Table Operations</h3>
+                <form hx-post="/ui/api/create-table" hx-target="#table-result" hx-indicator="#table-loading">
+                    <div class="form-group">
+                        <label>Database Name</label>
+                        <input type="text" name="db_name" placeholder="Database name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Table Name</label>
+                        <input type="text" name="table_name" placeholder="Table name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Schema</label>
+                        <textarea name="schema" rows="3" placeholder="id INT PRIMARY KEY, name VARCHAR(100), age INT" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Shard Key</label>
+                        <input type="text" name="shard_key" placeholder="id" required>
+                    </div>
+                    <button type="submit">Create Table</button>
+                    <img id="table-loading" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23667eea' stroke-width='2'/%3E%3Cpath fill='%23667eea' d='M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E" style="display:none; margin-left:10px;">
+                </form>
+                <div id="table-result" class="result"></div>
+            </div>
+            
+            <!-- Data Operations Card -->
+            <div class="card">
+                <h3>💾 Data Operations</h3>
+                <form hx-post="/ui/api/insert" hx-target="#data-result" hx-indicator="#data-loading">
+                    <div class="form-group">
+                        <label>Database Name</label>
+                        <input type="text" name="db_name" placeholder="Database name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Table Name</label>
+                        <input type="text" name="table_name" placeholder="Table name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Data (JSON format)</label>
+                        <textarea name="rows" rows="3" placeholder='[{"id":1,"name":"Alice","age":30}]' required></textarea>
+                    </div>
+                    <button type="submit">Insert Data</button>
+                    <img id="data-loading" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23667eea' stroke-width='2'/%3E%3Cpath fill='%23667eea' d='M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E" style="display:none; margin-left:10px;">
+                </form>
+                <div id="data-result" class="result"></div>
+            </div>
+            
+            <!-- Query Card -->
+            <div class="card">
+                <h3>🔍 Distributed Query</h3>
+                <form hx-post="/ui/api/select" hx-target="#query-result" hx-indicator="#query-loading">
+                    <div class="form-group">
+                        <label>Database Name</label>
+                        <input type="text" name="db_name" placeholder="Database name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Table Name</label>
+                        <input type="text" name="table_name" placeholder="Table name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>SQL Query</label>
+                        <input type="text" name="query" placeholder="SELECT COUNT(*) FROM users" required>
+                    </div>
+                    <button type="submit">Execute Query</button>
+                    <img id="query-loading" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23667eea' stroke-width='2'/%3E%3Cpath fill='%23667eea' d='M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E" style="display:none; margin-left:10px;">
+                </form>
+                <div id="query-result" class="result"></div>
+            </div>
+            
+            <!-- MapReduce Card -->
+            <div class="card">
+                <h3>🗺️ MapReduce - Word Count</h3>
+                <form hx-post="/ui/api/mapreduce" hx-target="#mr-result" hx-indicator="#mr-loading" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label>Text File</label>
+                        <input type="file" name="file" accept=".txt" required>
+                    </div>
+                    <button type="submit">Run Word Count</button>
+                    <img id="mr-loading" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23667eea' stroke-width='2'/%3E%3Cpath fill='%23667eea' d='M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E" style="display:none; margin-left:10px;">
+                </form>
+                <div id="mr-result" class="result"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Auto-refresh system stats
+        function loadSystemStats() {
+            fetch('/ui/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('system-stats').innerHTML = `
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-number">${data.databases}</div>
+                                <div>Databases</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number">${data.tables}</div>
+                                <div>Tables</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number">${data.workers_alive}</div>
+                                <div>Active Workers</div>
+                            </div>
+                        </div>
+                    `;
+                });
+        }
+        
+        // Auto-refresh workers
+        function loadWorkers() {
+            fetch('/ui/api/workers')
+                .then(response => response.json())
+                .then(workers => {
+                    let html = '<ul class="worker-list">';
+                    workers.forEach(w => {
+                        html += `
+                            <li>
+                                <span><strong>${w.id}</strong> (${w.tech})</span>
+                                <span class="status-badge status-${w.alive ? 'alive' : 'dead'}">
+                                    ${w.alive ? '🟢 ALIVE' : '🔴 DEAD'}
+                                </span>
+                                <span style="font-size:11px; color:#666;">${w.url}</span>
+                            </li>
+                        `;
+                    });
+                    html += '</ul>';
+                    document.getElementById('workers-list').innerHTML = html;
+                });
+        }
+        
+        loadSystemStats();
+        loadWorkers();
+        setInterval(loadSystemStats, 5000);
+        setInterval(loadWorkers, 5000);
+    </script>
+</body>
+</html>

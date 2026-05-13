@@ -1,0 +1,13 @@
+server:
+  port: ":8090"
+  name: "main-reducer"
+
+aggregator:
+  buffer_size: 100
+  flush_interval: 5
+
+merge:
+  max_workers: 4
+  timeout_seconds: 30
+
+log_level: "info"
