@@ -1,0 +1,20 @@
+server:
+  port: ":8083"
+  worker_id: "worker3"
+  technology: "go"
+
+mysql:
+  host: "localhost"
+  port: 3309
+  user: "root"
+  password: ""
+  database: "worker3_db"
+
+master:
+  url: "http://localhost:8080"
+  api_key: "my-secret-key-123"
+
+reducer:
+  url: "http://localhost:8090"
+
+heartbeat_interval: 5

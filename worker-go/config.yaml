@@ -1,31 +1,20 @@
 server:
-  port: ":8080"
+  port: ":8081"
+  worker_id: "worker1"
+  technology: "go"
 
-metadata_db:
+mysql:
   host: "localhost"
-  port: 3309
+  port: 3306           # ← Use Computer 2's MySQL port
   user: "root"
   password: ""
-  dbname: "distributed_metadata"
+  database: "worker1_db"
 
-workers:
-  - id: "worker1"
-    url: "http://localhost:8081"
-    tech: "go"
-  - id: "worker2"
-    url: "http://localhost:8082"
-    tech: "python"
-  - id: "worker3"
-    url: "http://localhost:8083"
-    tech: "nodejs"
-
-reducer:
-  url: "http://localhost:8090"
-
-auth:
+master:
+  url: "http://192.168.1.100:8080"    # ← CHANGE to Computer 1's IP
   api_key: "my-secret-key-123"
 
+reducer:
+  url: "http://192.168.1.100:8090"    # ← CHANGE to Computer 1's IP
+
 heartbeat_interval: 5
-replication_factor: 2
-shard_count: 64
-chunk_size_kb: 64

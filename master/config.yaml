@@ -17,7 +17,7 @@ workers:
     tech: "python"
   - id: "worker3"
     url: "http://localhost:8083"
-    tech: "nodejs"
+    tech: "go"
 
 reducer:
   url: "http://localhost:8090"
